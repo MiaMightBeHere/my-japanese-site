@@ -2,171 +2,143 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>青磁 | SEIJI Integrated</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>青磁 | SEIJI - 私人日语空间</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/kuroshiro@1.1.2/dist/kuroshiro.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/kuroshiro-analyzer-kuromoji@1.1.0/dist/kuroshiro-analyzer-kuromoji.min.js"></script>
     
     <style>
-        :root {
-            --glaze: #9DBDBA; /* 釉青 */
-            --paper: #F5F5F0; /* 米色 */
-            --ink: #2C2C2C;
-            --glass: rgba(255, 255, 255, 0.7);
-        }
+        :root { --glaze: #9DBDBA; --paper: #F5F5F0; --ink: #2C2C2C; --white: rgba(255,255,255,0.8); }
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body, html { margin: 0; padding: 0; height: 100%; background: var(--paper); font-family: "Noto Serif JP", serif; color: var(--ink); overflow: hidden; }
 
-        body, html {
-            margin: 0; padding: 0; height: 100%;
-            background-color: var(--paper);
-            font-family: "Noto Serif JP", serif;
-            color: var(--ink);
-            overflow: hidden;
-        }
+        /* 移动端适配导航 */
+        nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: var(--ink); display: flex; justify-content: space-around; align-items: center; z-index: 100; }
+        @media (min-width: 768px) { nav { width: 80px; height: 100%; flex-direction: column; top: 0; bottom: 0; justify-content: center; } }
+        
+        nav a { color: white; text-decoration: none; font-size: 0.8em; opacity: 0.5; padding: 10px; cursor: pointer; transition: 0.3s; }
+        nav a.active { opacity: 1; color: var(--glaze); text-shadow: 0 0 10px var(--glaze); }
 
-        /* 侧边导航栏 */
-        nav {
-            position: fixed; left: 0; top: 0; bottom: 0; width: 80px;
-            background: var(--ink);
-            display: flex; flex-direction: column; align-items: center;
-            padding-top: 40px; z-index: 100;
-        }
+        main { margin-bottom: 60px; height: calc(100% - 60px); overflow-y: auto; }
+        @media (min-width: 768px) { main { margin-left: 80px; margin-bottom: 0; height: 100%; } }
 
-        nav a {
-            color: white; text-decoration: none; margin-bottom: 40px;
-            writing-mode: vertical-rl; letter-spacing: 5px; font-size: 0.9em;
-            opacity: 0.5; transition: 0.3s; cursor: pointer;
-        }
-
-        nav a.active { opacity: 1; color: var(--glaze); border-right: 2px solid var(--glaze); }
-
-        /* 主容器 */
-        main {
-            margin-left: 80px; height: 100vh;
-            display: flex; flex-direction: column;
-        }
-
-        .page { display: none; height: 100%; padding: 40px; box-sizing: border-box; overflow-y: auto; }
+        .page { display: none; padding: 20px; max-width: 900px; margin: auto; animation: fadeIn 0.5s; }
         .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 摘录区样式 */
-        .card { background: white; padding: 20px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.02); }
+        /* 美化的摘录区域 */
+        .input-group { background: var(--white); padding: 20px; border-radius: 12px; border: 1px solid rgba(157, 189, 186, 0.3); margin-bottom: 30px; backdrop-filter: blur(10px); }
+        textarea { width: 100%; height: 80px; background: transparent; border: none; font-size: 1.1em; outline: none; resize: none; border-bottom: 1px solid #ddd; margin-bottom: 15px; }
+        button { background: var(--glaze); color: white; border: none; padding: 12px 25px; border-radius: 30px; cursor: pointer; float: right; }
+
+        /* 摘录卡片流 */
+        .snippet-card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid var(--glaze); box-shadow: 0 4px 15px rgba(0,0,0,0.03); position: relative; }
         ruby rt { color: var(--glaze); font-size: 0.6em; }
-        .eng-tag { font-size: 0.7em; background: #E8F0EF; color: #5A7D7A; padding: 2px 5px; margin-left: 5px; border-radius: 3px; }
+        .delete-btn { position: absolute; right: 10px; top: 10px; color: #ccc; font-size: 12px; cursor: pointer; }
 
-        /* 对照阅读区样式 */
-        .reader-split { display: flex; gap: 20px; height: 80%; }
-        .pane { flex: 1; background: var(--glass); padding: 30px; border-radius: 8px; overflow-y: auto; line-height: 2.5; }
-        .sentence { cursor: pointer; border-bottom: 1px solid transparent; transition: 0.2s; }
-        .sentence:hover { background: #E8F0EF; color: var(--glaze); }
-
-        /* 按钮与输入 */
-        textarea { width: 100%; height: 100px; border: 1px solid var(--glaze); background: transparent; padding: 10px; margin-bottom: 10px; }
-        button { background: var(--glaze); color: white; border: none; padding: 10px 20px; cursor: pointer; }
-
+        /* 阅读器 */
+        .reading-pane { line-height: 2.2; font-size: 1.1em; background: var(--white); padding: 25px; border-radius: 8px; }
+        .line { border-bottom: 1px dashed transparent; cursor: pointer; }
+        .line:hover { background: #E8F0EF; color: var(--glaze); }
     </style>
 </head>
 <body>
 
 <nav>
-    <a onclick="showPage('capture')" id="nav-capture" class="active">摘录箱</a>
-    <a onclick="showPage('reader')" id="nav-reader">对照阅读</a>
-    <a onclick="showPage('other')" id="nav-other">思考中</a>
+    <a onclick="showPage('capture')" id="nav-capture" class="active">摘录</a>
+    <a onclick="showPage('reader')" id="nav-reader">对照</a>
+    <a onclick="showPage('other')" id="nav-other">思考</a>
 </nav>
 
 <main>
     <div id="capture" class="page active">
-        <h2>智能摘录</h2>
-        <textarea id="manualInput" placeholder="在此输入日语段落..."></textarea>
-        <button onclick="addFromManual()">存入碎片</button>
-        <div id="cardList" style="margin-top: 30px;">
-            </div>
-    </div>
-
-    <div id="reader" class="page">
-        <h2>对照阅读 <small style="font-size: 0.5em; color: #999;">点击日文句子即可快速摘录</small></h2>
-        <div class="reader-split">
-            <div class="pane" id="jp-pane">
-                <p class="sentence" onclick="quickCapture('雪国であった。')">国境の長いトンネルを抜けると雪国であった。</p>
-                <p class="sentence" onclick="quickCapture('夜の底が白くなった。')">夜の底が白くなった。</p>
-            </div>
-            <div class="pane" id="cn-pane">
-                <p>穿过县界长长的隧道，便是雪国。</p>
-                <p>夜空下，大地变白了。</p>
-            </div>
+        <h2 style="font-weight: 200;">碎片收纳</h2>
+        <div class="input-group">
+            <textarea id="manualInput" placeholder="在此粘贴录入..."></textarea>
+            <button onclick="addSnippet()">保存至云端</button>
+            <div style="clear:both;"></div>
+        </div>
+        <div id="cardList">
+            <p style="text-align:center; color:#999;">正在同步云端记忆...</p>
         </div>
     </div>
 
-    <div id="other" class="page">
-        <h2>其他板块</h2>
-        <p>这里可以放置统计图表、复习提醒或你的个人笔记心得。</p>
+    <div id="reader" class="page">
+        <h2 style="font-weight: 200;">雪国 <small>川端康成</small></h2>
+        <div class="reading-pane">
+            <span class="line" onclick="quickAdd('国境の長いトンネルを抜けると雪国であった。')">国境の長いトンネルを抜けると雪国であった。</span><br>
+            <span style="color:#888; font-size:0.9em;">穿过县界长长的隧道，便是雪国。</span><br><br>
+            <span class="line" onclick="quickAdd('夜の底が白くなった。')">夜の底が白くなった。</span><br>
+            <span style="color:#888; font-size:0.9em;">夜空下，大地变白了。</span>
+        </div>
     </div>
 </main>
 
 <script>
-    // --- 初始化大脑 ---
+    // --- 配置你的 SUPABASE ---
+    const SUPABASE_URL = 'https://xrwllnmnhbnvguuanlfo.supabase.co'; 
+    const SUPABASE_KEY = 'sb_publishable_sXpc0n4cp_TOFn5Z2g2-9w_UVLHYU0q';
+    const supabase = libsupabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
     const kuroshiro = new Kuroshiro();
-    const loanwordDict = {"コンテクスト": "Context", "スマホ": "Smartphone", "メニュー": "Menu"};
-    let engineReady = false;
+    let isReady = false;
 
-    async function initEngine() {
+    // 初始化
+    async function init() {
         await kuroshiro.init(new KuromojiAnalyzer({ dictPath: "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict" }));
-        engineReady = true;
+        isReady = true;
+        loadSnippets(); // 页面打开时自动加载记忆
     }
-    initEngine();
+    init();
 
-    // --- 页面切换逻辑 ---
-    function showPage(pageId) {
+    function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-        document.getElementById(pageId).classList.add('active');
-        document.getElementById('nav-' + pageId).classList.add('active');
+        document.getElementById(id).classList.add('active');
+        document.getElementById('nav-'+id).classList.add('active');
     }
 
-    // --- 核心：摘录与处理逻辑 ---
-    async function processText(text) {
-        if(!engineReady) return "引擎加载中...";
-        // 标注假名
-        let html = await kuroshiro.convert(text, { to: "hiragana", mode: "furigana" });
-        // 标注外来语
-        const regex = /[\u30A1-\u30FAー]+/g;
-        html = html.replace(regex, m => `${m}<span class="eng-tag">${loanwordDict[m] || '外来语'}</span>`);
-        return html;
+    // 从数据库加载记忆
+    async function loadSnippets() {
+        const { data, error } = await supabase.from('snippets').select('*').order('created_at', { ascending: false });
+        if (data) {
+            const list = document.getElementById('cardList');
+            list.innerHTML = data.map(item => `
+                <div class="snippet-card">
+                    <div class="delete-btn" onclick="deleteSnippet(${item.id})">✕</div>
+                    <div>${item.furigana}</div>
+                </div>
+            `).join('');
+        }
     }
 
-    async function addFromManual() {
+    // 保存到数据库
+    async function addSnippet() {
         const text = document.getElementById('manualInput').value;
-        if(!text) return;
-        createCard(text);
-        document.getElementById('manualInput').value = "";
+        if(!text || !isReady) return;
+        
+        const furiganaHtml = await kuroshiro.convert(text, { to: "hiragana", mode: "furigana" });
+        
+        const { error } = await supabase.from('snippets').insert([{ content: text, furigana: furiganaHtml }]);
+        
+        if(!error) {
+            document.getElementById('manualInput').value = "";
+            loadSnippets(); // 刷新列表
+        }
     }
 
-    async function quickCapture(text) {
-        // 自动跳转到摘录区并创建卡片
+    async function quickAdd(text) {
         showPage('capture');
-        createCard(text);
+        document.getElementById('manualInput').value = text;
+        addSnippet();
     }
 
-    async function createCard(text) {
-        const list = document.getElementById('cardList');
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = "解析中...";
-        list.prepend(card);
-
-        const processed = await processText(text);
-        card.innerHTML = `
-            <div>${processed}</div>
-            <div style="margin-top:10px; text-align:right;">
-                <button onclick="speak('${text}')" style="font-size:10px; background:#ddd; color:#666;">播放</button>
-            </div>
-        `;
-    }
-
-    function speak(text) {
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'ja-JP';
-        window.speechSynthesis.speak(u);
+    async function deleteSnippet(id) {
+        await supabase.from('snippets').delete().eq('id', id);
+        loadSnippets();
     }
 </script>
-
 </body>
 </html>
